@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fichajes</title>
+
+  <style>
+    /* ASPECTO (CSS) */
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f4f5f7;
+      color: #1c2733;
+      margin: 0;
+      padding: 24px 16px;
+    }
+
+    .pagina {
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin: 20px 0 12px;
+    }
+
+    /* La barra agrupa los dos botones grandes y se queda pegada arriba
+       al desplazar la lista. */
+    .barra {
+      position: sticky;
+      top: 0;
+      background: #f4f5f7;
+      padding: 12px 0;
+    }
+
+    .botones {
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      flex: 1;
+      padding: 28px 0;
+      font-size: 22px;
+      font-weight: bold;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: flex 0.2s;
+    }
+
+    .entrar { background: #1e8e3e; }
+    .salir  { background: #d93025; }
+
+    /* El botón que toca pulsar ahora ocupa más sitio. */
+    .botones.fuera .entrar,
+    .botones.dentro .salir {
+      flex: 3;
+    }
+
+    /* El otro botón sigue disponible, pero con la letra más pequeña. */
+    .botones.fuera .salir,
+    .botones.dentro .entrar {
+      font-size: 17px;
+    }
+
+    /* Los dos botones grises de encima del registro, uno al lado del otro:
+       "Deshacer", "Añadir a mano" y "Copiar tabla". */
+    .acciones-registro {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .deshacer, .anadir, .copiar {
+      padding: 12px 0;
+      font-size: 15px;
+      font-weight: normal;
+      color: #1c2733;
+      background: #dde1e6;
+    }
+
+    /* Aspecto de un botón apagado: cuando no hay nada que deshacer o que copiar. */
+    .acciones-registro button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* Cada celda agrupa una entrada con su salida. */
+    .celda {
+      background: white;
+      padding: 12px 14px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      font-size: 17px;
+    }
+
+    /* Color de la celda al salir: verde si ha cumplido la jornada,
+       rojo si se ha quedado por debajo. */
+    .celda.cumple { background: #dff3e4; }
+    .celda.falta  { background: #fbe0de; }
+
+    /* Las guardias no se comparan con la jornada: color aparte, azul suave. */
+    .celda.guardia { background: #e1ebfa; }
+
+    /* Los dos botones pequeños para elegir cómo ver el registro. */
+    .vistas {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .vista {
+      padding: 8px 0;
+      font-size: 15px;
+      font-weight: normal;
+      color: #1c2733;
+      background: #dde1e6;
+    }
+
+    /* La vista elegida se marca en oscuro. */
+    .vista.activa {
+      color: white;
+      background: #1c2733;
+    }
+
+    /* La tabla es más ancha que un móvil: esta caja deja deslizarla
+       hacia los lados con el dedo. */
+    .tabla-caja {
+      overflow-x: auto;
+      background: white;
+      border-radius: 12px;
+    }
+
+    table {
+      border-collapse: collapse;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid #e3e6ea;
+    }
+
+    th {
+      background: #e9ecf0;
+    }
+
+    /* Color del número de la columna "Trabajado", igual que en las tarjetas:
+       verde si cumple la jornada, rojo si no y azul si es una guardia. */
+    td.cumple, td.falta, td.guardia { font-weight: bold; }
+    td.cumple  { color: #1e7a36; }
+    td.falta   { color: #b3261e; }
+    td.guardia { color: #1a56b0; }
+
+    /* SEGUNDA BARRA FIJA: los seis botones de "Registro" se quedan pegados
+       justo debajo de la barra de fichar. Su "top" (a qué altura se pega)
+       lo pone el JavaScript, porque depende de lo que mida la primera barra. */
+    .barra-registro {
+      position: sticky;
+      top: 0;
+      background: #f4f5f7;
+      padding-top: 8px;
+      z-index: 1;
+    }
+
+    /* z-index decide qué queda por encima cuando dos cosas se pisan:
+       gana el número más alto. La barra de fichar va sobre la de registro,
+       y el formulario, sobre todo lo demás. */
+    .barra { z-index: 2; }
+    .fondo { z-index: 10; }
+
+    /* VISTA DE RESUMEN: tres tarjetas blancas, una debajo de otra. */
+    .resumen-tarjeta {
+      background: white;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .resumen-tarjeta h3 {
+      font-size: 15px;
+      font-weight: normal;
+      color: #5f6b7a;
+      margin: 0 0 8px;
+    }
+
+    /* El saldo de las mañanas, en grande: verde si sobran horas, rojo si se deben. */
+    .saldo {
+      font-size: 26px;
+      font-weight: bold;
+      margin: 0;
+    }
+
+    .saldo.cumple { color: #1e7a36; }
+    .saldo.falta  { color: #b3261e; }
+
+    .detalle {
+      color: #5f6b7a;
+      font-size: 14px;
+      margin: 6px 0 0;
+    }
+
+    /* La tabla por mes también se desliza hacia los lados si no cabe. */
+    .tabla-ancha {
+      overflow-x: auto;
+    }
+
+    /* Letra y márgenes algo más pequeños, para que quepa sin deslizar. */
+    .tabla-ancha table {
+      width: 100%;
+      font-size: 13px;
+    }
+
+    .tabla-ancha th, .tabla-ancha td {
+      padding: 8px;
+    }
+
+    /* Las filas del resumen no se pueden tocar para corregir. */
+    #cuerpo-resumen tr {
+      cursor: default;
+    }
+
+    /* Leyenda del gráfico: un cuadradito de color delante de cada nombre. */
+    .leyenda {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+      margin: 0 0 6px;
+    }
+
+    .leyenda span::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+
+    .leyenda .de-manana::before  { background: #d9822b; }
+    .leyenda .de-guardia::before { background: #2a78d6; }
+
+    #grafico {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    #grafico text {
+      font-size: 12px;
+      fill: #5f6b7a;
+    }
+
+    #grafico .total {
+      fill: #1c2733;
+      font-weight: bold;
+    }
+
+    .semana {
+      cursor: pointer;
+    }
+
+    /* Jornada recién guardada a mano: se resalta unos segundos. */
+    .celda.resaltada {
+      outline: 3px solid #f2a900;
+      outline-offset: 2px;
+    }
+
+    tr.resaltada td {
+      background: #fff1c2;
+    }
+
+    .linea {
+      padding: 6px 10px;
+      border-left: 6px solid #999;
+      margin: 4px 0;
+    }
+
+    .linea.entrada { border-left-color: #1e8e3e; }
+    .linea.salida  { border-left-color: #d93025; }
+
+    .horas {
+      margin: 8px 0 2px;
+      padding-left: 16px;
+      font-weight: bold;
+    }
+
+    .vacio {
+      color: #5f6b7a;
+    }
+
+    /* Lo que tiene el atributo hidden no se ve nunca. */
+    [hidden] {
+      display: none !important;
+    }
+
+    /* Las jornadas se pueden tocar para corregirlas. */
+    .celda, tbody tr {
+      cursor: pointer;
+    }
+
+    .pista {
+      color: #5f6b7a;
+      font-size: 14px;
+      margin: 0 0 12px;
+    }
+
+    .nota {
+      color: #5f6b7a;
+      font-size: 14px;
+      margin: 6px 0 0;
+      padding-left: 16px;
+    }
+
+    /* FORMULARIO DE CORRECCIÓN.
+       El fondo oscuro cubre toda la pantalla y la ventana queda en el centro. */
+    .fondo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .ventana {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      width: 100%;
+      max-width: 380px;
+      box-sizing: border-box;
+    }
+
+    .ventana h2 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin: 14px 0 6px;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      font-size: 17px;
+      font-family: inherit;
+      border: 1px solid #b6bdc6;
+      border-radius: 10px;
+    }
+
+    .error {
+      color: #b3261e;
+      font-weight: bold;
+      margin: 14px 0 0;
+    }
+
+    .acciones {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .acciones button {
+      padding: 14px 0;
+      font-size: 17px;
+    }
+
+    .cancelar {
+      color: #1c2733;
+      background: #dde1e6;
+    }
+
+    .guardar {
+      background: #1c2733;
+    }
+
+    /* Botón para borrar la jornada: discreto, con letra roja. */
+    .borrar {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px 0;
+      font-size: 15px;
+      font-weight: normal;
+      color: #b3261e;
+      background: white;
+      border: 1px solid #b3261e;
+    }
+
+    /* Cuando pide confirmación, se pone rojo entero. */
+    .borrar.confirmar {
+      color: white;
+      background: #b3261e;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ESTRUCTURA (HTML) -->
+  <div class="pagina">
+    <h1>Fichajes</h1>
+
+    <div class="barra">
+      <div class="botones fuera" id="botones">
+        <button class="entrar" id="boton-entrar">Entrar</button>
+        <button class="salir" id="boton-salir">Salir</button>
+      </div>
+    </div>
+
+    <h2>Registro</h2>
+    <div class="barra-registro" id="barra-registro">
+    <div class="acciones-registro">
+      <button class="deshacer" id="boton-deshacer" disabled>Deshacer</button>
+      <button class="anadir" id="boton-anadir">Añadir a mano</button>
+      <button class="copiar" id="boton-copiar" disabled>Copiar tabla</button>
+    </div>
+
+    <div class="vistas">
+      <button class="vista activa" id="boton-tarjetas">Tarjetas</button>
+      <button class="vista" id="boton-tabla">Tabla</button>
+      <button class="vista" id="boton-resumen">Resumen</button>
+    </div>
+    </div>
+
+    <p class="pista" id="pista">Toca una jornada para corregirla.</p>
+    <p class="vacio" id="mensaje-vacio">Todavía no hay fichajes.</p>
+    <ul id="lista"></ul>
+
+    <div class="tabla-caja" id="caja-tabla" hidden>
+      <table>
+        <thead>
+          <tr>
+            <th>Entrada</th>
+            <th>Salida</th>
+            <th>Trabajado</th>
+            <th>Tipo</th>
+            <th>Corregido</th>
+          </tr>
+        </thead>
+        <tbody id="cuerpo-tabla"></tbody>
+      </table>
+    </div>
+
+    <!-- Vista de resumen: saldo de las mañanas, tabla por mes y gráfico por semana. -->
+    <div id="caja-resumen" hidden>
+      <div class="resumen-tarjeta">
+        <h3>Saldo de las mañanas</h3>
+        <p class="saldo" id="saldo-total"></p>
+        <p class="detalle" id="saldo-detalle"></p>
+        <p class="detalle" id="aviso-incompletas" hidden></p>
+      </div>
+
+      <div class="resumen-tarjeta">
+        <h3>Por mes</h3>
+        <div class="tabla-ancha">
+          <table>
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Mañanas</th>
+                <th>Guardias</th>
+                <th>Horas</th>
+                <th>Saldo</th>
+              </tr>
+            </thead>
+            <tbody id="cuerpo-resumen"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="resumen-tarjeta">
+        <h3>Horas por semana</h3>
+        <p class="leyenda"><span class="de-manana">Mañanas</span><span class="de-guardia">Guardias</span></p>
+        <svg id="grafico" viewBox="0 0 400 220" role="img" aria-label="Horas trabajadas por semana, en mañanas y guardias"></svg>
+        <p class="detalle" id="detalle-semana">Toca una barra para ver el detalle.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulario para corregir, añadir o borrar una jornada. Está oculto hasta que hace falta. -->
+  <div class="fondo" id="formulario" hidden>
+    <div class="ventana">
+      <h2 id="titulo-formulario">Corregir jornada</h2>
+
+      <label for="campo-entrada">Entrada</label>
+      <input type="datetime-local" id="campo-entrada">
+
+      <label for="campo-salida">Salida</label>
+      <input type="datetime-local" id="campo-salida">
+
+      <p class="nota">Al tocar un campo vacío se propone la hora habitual: 8:00 de entrada y 15:20 de salida. Déjalo vacío si ese fichaje no se hizo.</p>
+      <p class="error" id="mensaje-error" hidden></p>
+
+      <div class="acciones">
+        <button class="cancelar" id="boton-cancelar">Cancelar</button>
+        <button class="guardar" id="boton-guardar">Guardar</button>
+      </div>
+
+      <button class="borrar" id="boton-borrar">Borrar jornada</button>
+    </div>
+  </div>
+
+  <script>
+    // COMPORTAMIENTO (JavaScript)
+
+    // 1. Localizamos las piezas de la página con las que vamos a trabajar.
+    const botonEntrar = document.getElementById("boton-entrar");
+    const botonSalir = document.getElementById("boton-salir");
+    const botonDeshacer = document.getElementById("boton-deshacer");
+    const lista = document.getElementById("lista");
+    const mensajeVacio = document.getElementById("mensaje-vacio");
+    const botones = document.getElementById("botones");
+    const botonTarjetas = document.getElementById("boton-tarjetas");
+    const botonTabla = document.getElementById("boton-tabla");
+    const cajaTabla = document.getElementById("caja-tabla");
+    const cuerpoTabla = document.getElementById("cuerpo-tabla");
+    const pista = document.getElementById("pista");
+    const formulario = document.getElementById("formulario");
+    const campoEntrada = document.getElementById("campo-entrada");
+    const campoSalida = document.getElementById("campo-salida");
+    const mensajeError = document.getElementById("mensaje-error");
+    const botonCancelar = document.getElementById("boton-cancelar");
+    const botonGuardar = document.getElementById("boton-guardar");
+    const botonAnadir = document.getElementById("boton-anadir");
+    const botonBorrar = document.getElementById("boton-borrar");
+    const botonCopiar = document.getElementById("boton-copiar");
+    const tituloFormulario = document.getElementById("titulo-formulario");
+    const botonResumen = document.getElementById("boton-resumen");
+    const cajaResumen = document.getElementById("caja-resumen");
+    const saldoTotal = document.getElementById("saldo-total");
+    const saldoDetalle = document.getElementById("saldo-detalle");
+    const avisoIncompletas = document.getElementById("aviso-incompletas");
+    const cuerpoResumen = document.getElementById("cuerpo-resumen");
+    const grafico = document.getElementById("grafico");
+    const detalleSemana = document.getElementById("detalle-semana");
+
+    // 2. LOS DATOS. Esta lista es la "tabla" de la app: cada elemento es una
+    //    fila con cuatro casillas:
+    //      entrada:   el momento de la entrada (o null si no se fichó)
+    //      salida:    el momento de la salida (o null si todavía no hay)
+    //      abierta:   true mientras la entrada espera su salida
+    //      corregido: true si la fila se ha cambiado a mano
+    //    La fila más antigua va primero y la más reciente, al final.
+    let fichajes = [];
+
+    //    Para deshacer: una pila de copias de la tabla, la última encima.
+    let historial = [];
+
+    //    Qué vista del registro se está viendo: "tarjetas" o "tabla".
+    let vista = "tarjetas";
+
+    //    Qué fila se está corrigiendo en el formulario (su posición en la
+    //    tabla: 0 es la primera). null significa que no se corrige ninguna:
+    //    el formulario está cerrado o se está añadiendo una jornada nueva.
+    let posicionEnCorreccion = null;
+
+    //    La fila que se acaba de guardar a mano, para resaltarla. null: ninguna.
+    let filaResaltada = null;
+
+    //    true cuando ya se ha pulsado "Borrar jornada" una vez y falta confirmar.
+    let borradoPorConfirmar = false;
+
+    //    Nombre del cajón del navegador donde se guarda la tabla.
+    const NOMBRE_DEL_CAJON = "fichajes";
+
+    //    Jornada de referencia de una mañana: 7 h 20 min son 440 minutos.
+    const MINUTOS_DE_JORNADA = 440;
+
+    //    Si lo trabajado pasa de 12 horas (720 minutos), es una guardia.
+    const MINUTOS_PARA_GUARDIA = 720;
+
+    // 3. Devuelve el momento actual, sin segundos, como un número
+    //    (los milisegundos transcurridos desde 1970; así se guardan las fechas).
+    function momentoActual() {
+      const ahora = new Date();
+      ahora.setSeconds(0, 0);
+      return ahora.getTime();
+    }
+
+    // 4. Convierte un momento en texto: "jueves 12/11/26 · 08:02".
+    function textoDe(momento) {
+      const fechaCompleta = new Date(momento);
+      const fecha = fechaCompleta.toLocaleDateString("es-ES", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit"
+      });
+      const hora = fechaCompleta.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      return fecha.replace(",", "") + " · " + hora;
+    }
+
+    // 5. Calcula el tiempo entre la entrada y la salida: "8 h 05 min".
+    function tiempoTrabajado(entrada, salida) {
+      const minutosTotales = (salida - entrada) / 60000;
+      const horas = Math.floor(minutosTotales / 60);
+      const minutos = minutosTotales % 60;
+      return horas + " h " + String(minutos).padStart(2, "0") + " min";
+    }
+
+    // 5b. Minutos trabajados en una fila. Si le falta la entrada o la salida,
+    //     no se puede calcular y devuelve null.
+    function minutosDe(fila) {
+      if (fila.entrada === null || fila.salida === null) {
+        return null;
+      }
+      return (fila.salida - fila.entrada) / 60000;
+    }
+
+    // 5c. Tipo de jornada, deducido de la duración: "Guardia" o "Mañana".
+    function tipoDe(fila) {
+      const minutos = minutosDe(fila);
+      if (minutos === null) {
+        return "";
+      }
+      if (minutos > MINUTOS_PARA_GUARDIA) {
+        return "Guardia";
+      }
+      return "Mañana";
+    }
+
+    // 5d. Nombre del color de una jornada: "guardia", "cumple" o "falta".
+    //     Lo usan las tarjetas y la tabla, para que siempre coincidan.
+    //     Si la jornada está incompleta, no tiene color.
+    function colorDe(fila) {
+      const minutos = minutosDe(fila);
+      if (minutos === null) {
+        return "";
+      }
+      if (tipoDe(fila) === "Guardia") {
+        return "guardia";
+      }
+      if (minutos >= MINUTOS_DE_JORNADA) {
+        return "cumple";
+      }
+      return "falta";
+    }
+
+    // 5e. Textos cortos para la tabla: "28/10/26 08:04" y "24:32".
+    function fechaCorta(momento) {
+      return new Date(momento).toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit"
+      });
+    }
+
+    function fechaYHora(momento) {
+      const hora = new Date(momento).toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      return fechaCorta(momento) + " " + hora;
+    }
+
+    function duracionCorta(minutos) {
+      return Math.floor(minutos / 60) + ":" + String(minutos % 60).padStart(2, "0");
+    }
+
+    // 6. Busca la fila que está esperando su salida. Si no hay, devuelve null.
+    function filaAbierta() {
+      for (const fila of fichajes) {
+        if (fila.abierta) {
+          return fila;
+        }
+      }
+      return null;
+    }
+
+    // 7. GUARDAR: copia la tabla al cajón del navegador.
+    //    El cajón solo admite texto, así que JSON.stringify convierte
+    //    la tabla en texto.
+    function guardar() {
+      try {
+        localStorage.setItem(NOMBRE_DEL_CAJON, JSON.stringify(fichajes));
+      } catch (error) {
+        // Si el navegador no deja guardar, la app sigue funcionando
+        // como antes: sin memoria.
+      }
+    }
+
+    // 8. CARGAR: al abrir la página, recupera la tabla del cajón.
+    //    JSON.parse hace el camino contrario: convierte el texto en tabla.
+    function cargar() {
+      try {
+        const textoGuardado = localStorage.getItem(NOMBRE_DEL_CAJON);
+        if (textoGuardado !== null) {
+          fichajes = JSON.parse(textoGuardado);
+        }
+      } catch (error) {
+        fichajes = [];
+      }
+    }
+
+    // 9. DIBUJAR: borra lo que se ve y lo vuelve a pintar a partir de la tabla.
+    //    La pantalla es siempre un reflejo de los datos.
+    function dibujar() {
+      lista.innerHTML = "";
+
+      for (const fila of fichajes) {
+        const celda = document.createElement("li");
+        celda.className = "celda";
+
+        const lineaEntrada = document.createElement("div");
+        lineaEntrada.className = "linea entrada";
+        if (fila.entrada === null) {
+          lineaEntrada.textContent = "Entrada · sin fichar";
+        } else {
+          lineaEntrada.textContent = "Entrada · " + textoDe(fila.entrada);
+        }
+
+        const lineaSalida = document.createElement("div");
+        lineaSalida.className = "linea salida";
+        if (fila.salida !== null) {
+          lineaSalida.textContent = "Salida · " + textoDe(fila.salida);
+        } else if (fila.abierta) {
+          lineaSalida.textContent = "Salida · pendiente";
+        } else {
+          lineaSalida.textContent = "Salida · sin fichar";
+        }
+
+        celda.append(lineaEntrada, lineaSalida);
+
+        // Si la fila tiene entrada y salida, añadimos las horas, el tipo y el color.
+        const minutosTrabajados = minutosDe(fila);
+        if (minutosTrabajados !== null) {
+          const lineaHoras = document.createElement("div");
+          lineaHoras.className = "horas";
+          lineaHoras.textContent = "Trabajado: " + tiempoTrabajado(fila.entrada, fila.salida) + " · " + tipoDe(fila);
+          celda.append(lineaHoras);
+
+          // Guardia: azul. Mañana: verde si ha cumplido la jornada; rojo si no.
+          celda.className = "celda " + colorDe(fila);
+        }
+
+        if (fila.corregido) {
+          const nota = document.createElement("p");
+          nota.className = "nota";
+          nota.textContent = "Corregido a mano";
+          celda.append(nota);
+        }
+
+        if (fila === filaResaltada) {
+          celda.classList.add("resaltada");
+        }
+
+        // Al tocar la tarjeta se abre el formulario con esta fila.
+        const posicion = fichajes.indexOf(fila);
+        celda.addEventListener("click", function () {
+          abrirFormulario(posicion);
+        });
+
+        // prepend la coloca arriba: lo más reciente queda lo primero.
+        lista.prepend(celda);
+      }
+
+      dibujarTabla();
+      dibujarResumen();
+
+      // Solo se enseña la vista elegida. Sin fichajes, solo el mensaje.
+      mensajeVacio.hidden = fichajes.length > 0;
+      pista.hidden = fichajes.length === 0 || vista === "resumen";
+      lista.hidden = vista !== "tarjetas";
+      cajaTabla.hidden = vista !== "tabla" || fichajes.length === 0;
+      cajaResumen.hidden = vista !== "resumen" || fichajes.length === 0;
+
+      // Los tres botones se apagan y se enciende solo el de la vista elegida.
+      botonTarjetas.className = "vista";
+      botonTabla.className = "vista";
+      botonResumen.className = "vista";
+      if (vista === "tabla") {
+        botonTabla.className = "vista activa";
+      } else if (vista === "resumen") {
+        botonResumen.className = "vista activa";
+      } else {
+        botonTarjetas.className = "vista activa";
+      }
+
+      // El botón grande es "Salir" si hay una entrada abierta; si no, "Entrar".
+      if (filaAbierta() !== null) {
+        botones.className = "botones dentro";
+      } else {
+        botones.className = "botones fuera";
+      }
+
+      botonDeshacer.disabled = historial.length === 0;
+      botonCopiar.disabled = fichajes.length === 0;
+    }
+
+    // 9a. Los cinco textos de una fila, en el orden de las columnas:
+    //     Entrada, Salida, Trabajado, Tipo y Corregido.
+    //     Los usan la tabla de la pantalla y el botón "Copiar tabla".
+    function casillasDe(fila) {
+      let entrada = "sin fichar";
+      if (fila.entrada !== null) {
+        entrada = fechaYHora(fila.entrada);
+      }
+
+      let salida = "sin fichar";
+      if (fila.salida !== null) {
+        salida = fechaYHora(fila.salida);
+      } else if (fila.abierta) {
+        salida = "pendiente";
+      }
+
+      let trabajado = "";
+      const minutos = minutosDe(fila);
+      if (minutos !== null) {
+        trabajado = duracionCorta(minutos);
+      }
+
+      let corregido = "No";
+      if (fila.corregido) {
+        corregido = "Sí";
+      }
+
+      return [entrada, salida, trabajado, tipoDe(fila), corregido];
+    }
+
+    // 9b. DIBUJAR LA TABLA: los mismos datos, una fila de tabla por jornada.
+    function dibujarTabla() {
+      cuerpoTabla.innerHTML = "";
+
+      for (const fila of fichajes) {
+        // tr es una fila de la tabla y td, cada casilla.
+        const filaDeTabla = document.createElement("tr");
+        for (const texto of casillasDe(fila)) {
+          const casilla = document.createElement("td");
+          casilla.textContent = texto;
+          filaDeTabla.append(casilla);
+        }
+
+        // La casilla de "Trabajado" es la tercera (se cuenta desde 0: 0, 1, 2).
+        filaDeTabla.children[2].className = colorDe(fila);
+
+        if (fila === filaResaltada) {
+          filaDeTabla.className = "resaltada";
+        }
+
+        // Al tocar la fila de la tabla se abre el formulario con esta fila.
+        const posicion = fichajes.indexOf(fila);
+        filaDeTabla.addEventListener("click", function () {
+          abrirFormulario(posicion);
+        });
+
+        cuerpoTabla.prepend(filaDeTabla);
+      }
+    }
+
+    // 9b-2. Lleva la pantalla hasta la jornada recién guardada y, pasados
+    //       dos segundos y medio, le quita el resaltado.
+    function mostrarResaltada() {
+      let elemento = lista.querySelector(".resaltada");
+      if (vista === "tabla") {
+        elemento = cuerpoTabla.querySelector(".resaltada");
+      }
+      if (elemento === null) {
+        return;
+      }
+
+      elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      // setTimeout ejecuta una función más tarde: aquí, a los 2500 milisegundos.
+      setTimeout(function () {
+        filaResaltada = null;
+        for (const resaltado of document.querySelectorAll(".resaltada")) {
+          resaltado.classList.remove("resaltada");
+        }
+      }, 2500);
+    }
+
+    // 9b-3. COPIAR LA TABLA.
+    //       Prepara toda la tabla como texto: una línea por jornada, de la más
+    //       antigua a la más reciente, con una primera línea de títulos.
+    //       "\t" es un tabulador (separa columnas) y "\n", un salto de línea.
+    function textoDeLaTabla() {
+      const lineas = ["Entrada\tSalida\tTrabajado\tTipo\tCorregido"];
+      for (const fila of fichajes) {
+        lineas.push(casillasDe(fila).join("\t"));
+      }
+      return lineas.join("\n");
+    }
+
+    //       Cambia un momento el texto del botón para decir cómo ha ido.
+    function avisarCopia(texto) {
+      botonCopiar.textContent = texto;
+      setTimeout(function () {
+        botonCopiar.textContent = "Copiar tabla";
+      }, 2000);
+    }
+
+    //       Forma antigua de copiar, por si el navegador no admite la moderna:
+    //       se escribe el texto en un campo invisible, se selecciona y se copia.
+    function copiarAlModoAntiguo() {
+      const campo = document.createElement("textarea");
+      campo.value = textoDeLaTabla();
+      campo.style.position = "fixed";
+      campo.style.opacity = "0";
+      document.body.append(campo);
+      campo.select();
+
+      let copiado = false;
+      try {
+        copiado = document.execCommand("copy");
+      } catch (error) {
+        copiado = false;
+      }
+      campo.remove();
+
+      if (copiado) {
+        avisarCopia("Copiado");
+      } else {
+        avisarCopia("No se pudo");
+      }
+    }
+
+    //       Qué pasa al pulsar "Copiar tabla": el texto va al portapapeles,
+    //       que es donde el aparato guarda lo último que se ha copiado.
+    function copiarTabla() {
+      try {
+        navigator.clipboard.writeText(textoDeLaTabla()).then(function () {
+          avisarCopia("Copiado");
+        }, copiarAlModoAntiguo);
+      } catch (error) {
+        copiarAlModoAntiguo();
+      }
+    }
+
+    // 9c. Cambiar de vista: se apunta cuál se quiere y se vuelve a dibujar.
+    function verTarjetas() {
+      vista = "tarjetas";
+      dibujar();
+    }
+
+    function verTabla() {
+      vista = "tabla";
+      dibujar();
+    }
+
+    // 9d. CORREGIR A MANO.
+    //     Los campos de fecha y hora del formulario usan un texto con esta
+    //     forma: "2026-11-13T08:02". Estas dos funciones traducen entre ese
+    //     texto y los momentos que guarda la app.
+    function textoParaCampo(momento) {
+      if (momento === null) {
+        return "";
+      }
+      const f = new Date(momento);
+      const dosCifras = function (numero) {
+        return String(numero).padStart(2, "0");
+      };
+      return f.getFullYear() + "-" + dosCifras(f.getMonth() + 1) + "-" + dosCifras(f.getDate()) +
+        "T" + dosCifras(f.getHours()) + ":" + dosCifras(f.getMinutes());
+    }
+
+    function momentoDeCampo(texto) {
+      if (texto === "") {
+        return null;
+      }
+      return new Date(texto).getTime();
+    }
+
+    //     HORAS SUGERIDAS. Si se toca un campo que está vacío, se rellena con
+    //     la hora habitual (8:00 para la entrada, 15:20 para la salida) en el
+    //     mismo día que el otro campo o, si el otro también está vacío, hoy.
+    //     Si el campo ya tiene una hora, no se toca.
+    function sugerirHora(campo, otroCampo, hora, minuto) {
+      if (campo.value !== "") {
+        return;
+      }
+
+      let dia = new Date();
+      if (otroCampo.value !== "") {
+        dia = new Date(otroCampo.value);
+      }
+      dia.setHours(hora, minuto, 0, 0);
+
+      campo.value = textoParaCampo(dia.getTime());
+    }
+
+    //     Deja el formulario listo y lo muestra. Lo usan las dos funciones
+    //     siguientes: una para corregir y otra para añadir.
+    function mostrarFormulario(titulo, entrada, salida, sePuedeBorrar) {
+      tituloFormulario.textContent = titulo;
+      campoEntrada.value = textoParaCampo(entrada);
+      campoSalida.value = textoParaCampo(salida);
+      mensajeError.hidden = true;
+
+      botonBorrar.hidden = !sePuedeBorrar;
+      botonBorrar.textContent = "Borrar jornada";
+      botonBorrar.className = "borrar";
+      borradoPorConfirmar = false;
+
+      formulario.hidden = false;
+    }
+
+    //     Corregir: abre el formulario con los datos de la fila que se ha tocado.
+    function abrirFormulario(posicion) {
+      posicionEnCorreccion = posicion;
+      mostrarFormulario("Corregir jornada", fichajes[posicion].entrada, fichajes[posicion].salida, true);
+    }
+
+    //     Añadir: abre el formulario vacío.
+    function abrirFormularioVacio() {
+      posicionEnCorreccion = null;
+      mostrarFormulario("Añadir jornada", null, null, false);
+    }
+
+    //     Cierra el formulario sin cambiar nada.
+    function cerrarFormulario() {
+      posicionEnCorreccion = null;
+      formulario.hidden = true;
+    }
+
+    //     Momento por el que se ordena una fila: su entrada o, si no tiene, su salida.
+    function momentoDeFila(fila) {
+      if (fila.entrada !== null) {
+        return fila.entrada;
+      }
+      return fila.salida;
+    }
+
+    //     Ordena la tabla de la jornada más antigua a la más reciente.
+    function ordenar() {
+      fichajes.sort(function (a, b) {
+        return momentoDeFila(a) - momentoDeFila(b);
+      });
+    }
+
+    //     Enseña un aviso dentro del formulario.
+    function avisar(texto) {
+      mensajeError.textContent = texto;
+      mensajeError.hidden = false;
+    }
+
+    //     Qué pasa al pulsar "Guardar" en el formulario.
+    function guardarCorreccion() {
+      const entrada = momentoDeCampo(campoEntrada.value);
+      const salida = momentoDeCampo(campoSalida.value);
+
+      // Primero se comprueba que lo escrito tiene sentido.
+      if (entrada === null && salida === null) {
+        avisar("Escribe al menos la entrada o la salida.");
+        return;
+      }
+      if (entrada !== null && salida !== null && salida <= entrada) {
+        avisar("La salida tiene que ser posterior a la entrada.");
+        return;
+      }
+
+      if (posicionEnCorreccion === null) {
+        // AÑADIR: una fila nueva. Nace cerrada: si le falta la salida,
+        // se verá como "sin fichar", no como "pendiente".
+        guardarFoto();
+        const nueva = { entrada: entrada, salida: salida, abierta: false, corregido: true };
+        fichajes.push(nueva);
+        filaResaltada = nueva;
+      } else {
+        // CORREGIR: se cambia la fila que se había tocado.
+        const fila = fichajes[posicionEnCorreccion];
+
+        // Si no se ha cambiado nada, se cierra sin más.
+        if (entrada === fila.entrada && salida === fila.salida) {
+          cerrarFormulario();
+          return;
+        }
+
+        guardarFoto();
+        fila.entrada = entrada;
+        fila.salida = salida;
+        fila.corregido = true;
+        filaResaltada = fila;
+
+        // Una fila con salida, o sin entrada, ya no está esperando su salida.
+        if (salida !== null || entrada === null) {
+          fila.abierta = false;
+        }
+      }
+
+      // Con las fechas cambiadas, la fila puede no estar ya en su sitio.
+      ordenar();
+
+      cerrarFormulario();
+      guardar();
+      dibujar();
+
+      // Como puede haberse movido, la pantalla va hasta ella y la resalta.
+      mostrarResaltada();
+    }
+
+    //     Qué pasa al pulsar "Borrar jornada". La primera pulsación solo pide
+    //     confirmación; la segunda borra de verdad.
+    function borrarJornada() {
+      if (!borradoPorConfirmar) {
+        borradoPorConfirmar = true;
+        botonBorrar.textContent = "¿Seguro? Toca otra vez para borrar";
+        botonBorrar.className = "borrar confirmar";
+        return;
+      }
+
+      guardarFoto();
+
+      // splice quita elementos de una lista: aquí, 1 fila desde esa posición.
+      fichajes.splice(posicionEnCorreccion, 1);
+
+      cerrarFormulario();
+      guardar();
+      dibujar();
+    }
+
+    // 10. Guarda en el historial una copia de la tabla tal como está ahora.
+    //     Se llama justo antes de cada fichaje y de cada cambio a mano.
+    function guardarFoto() {
+      historial.push(JSON.stringify(fichajes));
+    }
+
+    // 11. Qué pasa al pulsar "Entrar".
+    function entrar() {
+      guardarFoto();
+
+      // Si había una entrada sin salida, deja de estar abierta:
+      // se verá como "Salida · sin fichar".
+      const anterior = filaAbierta();
+      if (anterior !== null) {
+        anterior.abierta = false;
+      }
+
+      // Añadimos una fila nueva a la tabla.
+      fichajes.push({ entrada: momentoActual(), salida: null, abierta: true, corregido: false });
+
+      guardar();
+      dibujar();
+    }
+
+    // 12. Qué pasa al pulsar "Salir".
+    function salir() {
+      guardarFoto();
+
+      const fila = filaAbierta();
+      if (fila === null) {
+        // No hay entrada abierta: fila solo con la salida.
+        fichajes.push({ entrada: null, salida: momentoActual(), abierta: false, corregido: false });
+      } else {
+        // Completamos la fila abierta.
+        fila.salida = momentoActual();
+        fila.abierta = false;
+      }
+
+      guardar();
+      dibujar();
+    }
+
+    // 13. Qué pasa al pulsar "Deshacer":
+    //     se recupera la última copia de la tabla.
+    function deshacer() {
+      if (historial.length === 0) {
+        return;
+      }
+
+      fichajes = JSON.parse(historial.pop());
+
+      guardar();
+      dibujar();
+    }
+
+    // 13b. HISTORIAL DE LA HOJA.
+    //      Las jornadas que ya estaban apuntadas en la hoja de cálculo, tal
+    //      como venían: una línea por jornada, con la entrada y la salida
+    //      separadas por un punto y coma. Si falta la salida, se queda vacía.
+    //      La lista está vacía a propósito: las jornadas ya se cargaron en el
+    //      aparato que las necesitaba y se han quitado de aquí para que no las
+    //      reciba cualquiera que abra el enlace.
+    const HISTORIAL_DE_LA_HOJA = [];
+
+    //      Nombre de la nota del cajón que dice "el historial ya está cargado".
+    const NOTA_DE_HISTORIAL = "historial-cargado";
+
+    //      Traduce un texto de la hoja ("19/10/2026 07:59:45") al momento
+    //      que guarda la app. Los segundos se ignoran. Si el texto está vacío
+    //      o no tiene esa forma, devuelve null.
+    function momentoDeTextoDeHoja(texto) {
+      // Trocea el texto en sus cinco números: día, mes, año, hora y minuto.
+      const trozos = texto.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
+      if (trozos === null) {
+        return null;
+      }
+      // Los meses se cuentan desde 0 (enero es 0): por eso se resta 1.
+      return new Date(Number(trozos[3]), Number(trozos[2]) - 1, Number(trozos[1]),
+        Number(trozos[4]), Number(trozos[5])).getTime();
+    }
+
+    //      ¿Hay ya en la tabla una jornada con esta misma entrada?
+    function yaExisteEntrada(entrada) {
+      for (const fila of fichajes) {
+        if (fila.entrada === entrada) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    //      Añade a la tabla las jornadas de la hoja. Se hace una sola vez en
+    //      cada aparato: después se deja una nota en el cajón para no repetirlo.
+    function cargarHistorial() {
+      try {
+        if (localStorage.getItem(NOTA_DE_HISTORIAL) !== null) {
+          return;
+        }
+      } catch (error) {
+        // Sin cajón no hay nota: se sigue adelante.
+      }
+
+      for (const linea of HISTORIAL_DE_LA_HOJA) {
+        // split parte la línea por el punto y coma: entrada y salida.
+        const casillas = linea.split(";");
+        const entrada = momentoDeTextoDeHoja(casillas[0]);
+        const salida = momentoDeTextoDeHoja(casillas[1]);
+
+        // Se salta la línea si no se entiende o si esa jornada ya está.
+        if (entrada === null || yaExisteEntrada(entrada)) {
+          continue;
+        }
+
+        fichajes.push({ entrada: entrada, salida: salida, abierta: false, corregido: false });
+      }
+
+      ordenar();
+      guardar();
+
+      try {
+        localStorage.setItem(NOTA_DE_HISTORIAL, "sí");
+      } catch (error) {
+        // Si no se puede dejar la nota, no pasa nada.
+      }
+    }
+
+    // 13c. RESUMEN.
+    //      El resumen no se guarda: se calcula cada vez a partir de la tabla,
+    //      igual que las tarjetas y la tabla. Son los mismos datos, agrupados.
+    const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul",
+      "ago", "sep", "oct", "nov", "dic"];
+
+    //      Cuántas semanas caben en el gráfico: las últimas ocho.
+    const SEMANAS_EN_EL_GRAFICO = 8;
+
+    //      Colores de las barras del gráfico.
+    const COLOR_MANANAS = "#d9822b";
+    const COLOR_GUARDIAS = "#2a78d6";
+
+    //      Estas dos funciones dicen a qué montón pertenece un momento:
+    //      devuelven el primer día de su mes o el lunes de su semana.
+    function inicioDeMes(momento) {
+      const f = new Date(momento);
+      return new Date(f.getFullYear(), f.getMonth(), 1).getTime();
+    }
+
+    function inicioDeSemana(momento) {
+      const f = new Date(momento);
+      f.setHours(0, 0, 0, 0);
+      // getDay da 0 para el domingo y 1 para el lunes: esta cuenta dice
+      // cuántos días han pasado desde el lunes.
+      const diasDesdeElLunes = (f.getDay() + 6) % 7;
+      f.setDate(f.getDate() - diasDesdeElLunes);
+      return f.getTime();
+    }
+
+    //      AGRUPAR Y SUMAR. Reparte las jornadas completas en montones (por
+    //      mes o por semana, según la función que reciba) y en cada montón
+    //      cuenta las mañanas y las guardias y suma sus minutos.
+    //      Una jornada pertenece al montón del día de su entrada.
+    function agrupar(inicioDe) {
+      const grupos = [];
+
+      for (const fila of fichajes) {
+        const minutos = minutosDe(fila);
+        if (minutos === null) {
+          continue;
+        }
+
+        // Busca el montón de esta jornada; si no existe todavía, lo crea.
+        const inicio = inicioDe(fila.entrada);
+        let grupo = null;
+        for (const candidato of grupos) {
+          if (candidato.inicio === inicio) {
+            grupo = candidato;
+          }
+        }
+        if (grupo === null) {
+          grupo = { inicio: inicio, mananas: 0, guardias: 0, minutosMananas: 0, minutosGuardias: 0 };
+          grupos.push(grupo);
+        }
+
+        if (tipoDe(fila) === "Guardia") {
+          grupo.guardias = grupo.guardias + 1;
+          grupo.minutosGuardias = grupo.minutosGuardias + minutos;
+        } else {
+          grupo.mananas = grupo.mananas + 1;
+          grupo.minutosMananas = grupo.minutosMananas + minutos;
+        }
+      }
+
+      grupos.sort(function (a, b) {
+        return a.inicio - b.inicio;
+      });
+      return grupos;
+    }
+
+    //      SALDO DE LAS MAÑANAS de un montón: lo trabajado en las mañanas menos
+    //      lo que tocaba (número de mañanas por 7 h 20 min).
+    //      Positivo: sobran horas. Negativo: se deben.
+    function saldoDe(grupo) {
+      return grupo.minutosMananas - grupo.mananas * MINUTOS_DE_JORNADA;
+    }
+
+    //      Textos: "7 h 05 min" y, para el saldo de la tabla, "+1:10" o "−0:25".
+    function horasYMinutos(minutos) {
+      return Math.floor(minutos / 60) + " h " + String(minutos % 60).padStart(2, "0") + " min";
+    }
+
+    function textoDeSaldo(saldo) {
+      if (saldo < 0) {
+        return "−" + duracionCorta(-saldo);
+      }
+      return "+" + duracionCorta(saldo);
+    }
+
+    //      Color de un saldo: rojo ("falta") si se deben horas; verde si no.
+    function colorDeSaldo(saldo) {
+      if (saldo < 0) {
+        return "falta";
+      }
+      return "cumple";
+    }
+
+    //      "19/10": día y mes, para las etiquetas del gráfico.
+    function diaYMes(momento) {
+      return new Date(momento).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
+    }
+
+    //      DIBUJAR EL RESUMEN: el saldo total, la tabla por mes y el gráfico.
+    function dibujarResumen() {
+      const meses = agrupar(inicioDeMes);
+
+      // Total de todos los meses.
+      const total = { mananas: 0, minutosMananas: 0 };
+      for (const mes of meses) {
+        total.mananas = total.mananas + mes.mananas;
+        total.minutosMananas = total.minutosMananas + mes.minutosMananas;
+      }
+      const saldo = saldoDe(total);
+
+      if (total.mananas === 0) {
+        saldoTotal.textContent = "Todavía no hay mañanas completas";
+        saldoTotal.className = "saldo";
+        saldoDetalle.textContent = "";
+      } else {
+        if (saldo < 0) {
+          saldoTotal.textContent = "Debe " + horasYMinutos(-saldo);
+        } else if (saldo > 0) {
+          saldoTotal.textContent = "Le sobran " + horasYMinutos(saldo);
+        } else {
+          saldoTotal.textContent = "Al día: ni debe ni le sobran";
+        }
+        saldoTotal.className = "saldo " + colorDeSaldo(saldo);
+        saldoDetalle.textContent = total.mananas + " mañanas · trabajado " + horasYMinutos(total.minutosMananas) +
+          " · tocaba " + horasYMinutos(total.mananas * MINUTOS_DE_JORNADA);
+      }
+
+      // Jornadas a las que les falta la entrada o la salida: no se pueden sumar.
+      // La que está abierta ahora mismo no cuenta como olvido.
+      let incompletas = 0;
+      for (const fila of fichajes) {
+        if (minutosDe(fila) === null && !fila.abierta) {
+          incompletas = incompletas + 1;
+        }
+      }
+      avisoIncompletas.hidden = incompletas === 0;
+      if (incompletas === 1) {
+        avisoIncompletas.textContent = "1 jornada sin completar no entra en las cuentas.";
+      } else {
+        avisoIncompletas.textContent = incompletas + " jornadas sin completar no entran en las cuentas.";
+      }
+
+      // Tabla por mes: el más reciente, arriba.
+      cuerpoResumen.innerHTML = "";
+      for (const mes of meses) {
+        const f = new Date(mes.inicio);
+        const textos = [
+          MESES[f.getMonth()] + " " + String(f.getFullYear() % 100),
+          String(mes.mananas),
+          String(mes.guardias),
+          duracionCorta(mes.minutosMananas + mes.minutosGuardias),
+          ""
+        ];
+        if (mes.mananas > 0) {
+          textos[4] = textoDeSaldo(saldoDe(mes));
+        }
+
+        const filaDeTabla = document.createElement("tr");
+        for (const texto of textos) {
+          const casilla = document.createElement("td");
+          casilla.textContent = texto;
+          filaDeTabla.append(casilla);
+        }
+        if (mes.mananas > 0) {
+          filaDeTabla.children[4].className = colorDeSaldo(saldoDe(mes));
+        }
+        cuerpoResumen.prepend(filaDeTabla);
+      }
+
+      dibujarGrafico();
+    }
+
+    //      Crea una pieza del gráfico (una línea, un rectángulo, un texto) con
+    //      sus atributos. El gráfico es un SVG: un dibujo hecho con etiquetas.
+    function pieza(etiqueta, atributos, texto) {
+      const elemento = document.createElementNS("http://www.w3.org/2000/svg", etiqueta);
+      for (const nombre in atributos) {
+        elemento.setAttribute(nombre, atributos[nombre]);
+      }
+      if (texto !== undefined) {
+        elemento.textContent = texto;
+      }
+      return elemento;
+    }
+
+    //      DIBUJAR EL GRÁFICO: una barra por semana, con las horas de las
+    //      mañanas abajo y las de las guardias encima.
+    function dibujarGrafico() {
+      grafico.innerHTML = "";
+      detalleSemana.textContent = "Toca una barra para ver el detalle.";
+
+      // slice(-8) se queda con los ocho últimos elementos de la lista.
+      const semanas = agrupar(inicioDeSemana).slice(-SEMANAS_EN_EL_GRAFICO);
+      if (semanas.length === 0) {
+        detalleSemana.textContent = "Todavía no hay jornadas completas.";
+        return;
+      }
+
+      // Medidas del dibujo, en las unidades del SVG (400 de ancho por 220 de alto).
+      const izquierda = 34;
+      const arriba = 20;
+      const ancho = 358;
+      const alto = 174;
+      const base = arriba + alto;
+
+      // La semana con más horas marca el tope de la escala, redondeado
+      // hacia arriba a la decena: 47 horas dan una escala hasta 50.
+      let maximo = 0;
+      for (const semana of semanas) {
+        maximo = Math.max(maximo, (semana.minutosMananas + semana.minutosGuardias) / 60);
+      }
+      const tope = Math.max(10, Math.ceil(maximo / 10) * 10);
+
+      // Tres líneas de referencia: 0, la mitad y el tope.
+      for (const horas of [0, tope / 2, tope]) {
+        const y = base - (horas / tope) * alto;
+        grafico.append(pieza("line", { x1: izquierda, x2: izquierda + ancho, y1: y, y2: y, stroke: "#e3e6ea" }));
+        grafico.append(pieza("text", { x: izquierda - 6, y: y + 4, "text-anchor": "end" }, horas + " h"));
+      }
+
+      const hueco = ancho / semanas.length;
+      const anchoDeBarra = Math.min(36, hueco * 0.6);
+
+      semanas.forEach(function (semana, numero) {
+        const centro = izquierda + hueco * numero + hueco / 2;
+        const x = centro - anchoDeBarra / 2;
+        const altoMananas = (semana.minutosMananas / 60 / tope) * alto;
+        const altoGuardias = (semana.minutosGuardias / 60 / tope) * alto;
+        const grupo = pieza("g", { class: "semana" });
+
+        if (altoMananas > 0) {
+          grupo.append(pieza("rect", { x: x, y: base - altoMananas, width: anchoDeBarra,
+            height: altoMananas, rx: 3, fill: COLOR_MANANAS }));
+        }
+        if (altoGuardias > 0) {
+          // Una rendija de 2 unidades separa las guardias de las mañanas.
+          let rendija = 0;
+          if (altoMananas > 0) {
+            rendija = 2;
+          }
+          grupo.append(pieza("rect", { x: x, y: base - altoMananas - altoGuardias, width: anchoDeBarra,
+            height: Math.max(1, altoGuardias - rendija), rx: 3, fill: COLOR_GUARDIAS }));
+        }
+
+        const minutosTotales = semana.minutosMananas + semana.minutosGuardias;
+        grupo.append(pieza("text", { x: centro, y: base - altoMananas - altoGuardias - 5,
+          "text-anchor": "middle", class: "total" }, Math.round(minutosTotales / 60) + " h"));
+        grupo.append(pieza("text", { x: centro, y: base + 16, "text-anchor": "middle" }, diaYMes(semana.inicio)));
+
+        // Un rectángulo invisible que ocupa toda la columna, para que sea
+        // fácil acertar con el dedo.
+        grupo.append(pieza("rect", { x: centro - hueco / 2, y: 0, width: hueco, height: 220, fill: "transparent" }));
+
+        grupo.addEventListener("click", function () {
+          detalleSemana.textContent = "Semana del " + diaYMes(semana.inicio) +
+            " · Mañanas: " + semana.mananas + " (" + duracionCorta(semana.minutosMananas) + ")" +
+            " · Guardias: " + semana.guardias + " (" + duracionCorta(semana.minutosGuardias) + ")" +
+            " · Total: " + duracionCorta(minutosTotales);
+        });
+
+        grafico.append(grupo);
+      });
+    }
+
+    function verResumen() {
+      vista = "resumen";
+      dibujar();
+    }
+
+    // 14. Conectamos cada botón con su función.
+    botonEntrar.addEventListener("click", entrar);
+    botonSalir.addEventListener("click", salir);
+    botonDeshacer.addEventListener("click", deshacer);
+    botonTarjetas.addEventListener("click", verTarjetas);
+    botonTabla.addEventListener("click", verTabla);
+    botonCancelar.addEventListener("click", cerrarFormulario);
+    botonGuardar.addEventListener("click", guardarCorreccion);
+    botonAnadir.addEventListener("click", abrirFormularioVacio);
+    botonBorrar.addEventListener("click", borrarJornada);
+    botonCopiar.addEventListener("click", copiarTabla);
+    botonResumen.addEventListener("click", verResumen);
+
+    //     SEGUNDA BARRA FIJA. Mide la barra de fichar y le dice a la barra de
+    //     registro que se pegue justo debajo. offsetHeight es la altura de un
+    //     elemento en píxeles.
+    const barraDeFichar = document.querySelector(".barra");
+    const barraDeRegistro = document.getElementById("barra-registro");
+
+    function colocarBarraDeRegistro() {
+      barraDeRegistro.style.top = barraDeFichar.offsetHeight + "px";
+    }
+
+    //     "resize" es el evento que ocurre cuando cambia el tamaño de la
+    //     ventana, por ejemplo al girar el móvil: se vuelve a medir.
+    window.addEventListener("resize", colocarBarraDeRegistro);
+
+    //     "focus" es el evento que ocurre cuando se toca un campo para escribir en él.
+    campoEntrada.addEventListener("focus", function () {
+      sugerirHora(campoEntrada, campoSalida, 8, 0);
+    });
+    campoSalida.addEventListener("focus", function () {
+      sugerirHora(campoSalida, campoEntrada, 15, 20);
+    });
+
+    // 15. Al abrir la página: recuperamos lo guardado, añadimos el historial
+    //     de la hoja si todavía no está, y lo pintamos.
+    cargar();
+    cargarHistorial();
+    dibujar();
+    colocarBarraDeRegistro();
+  </script>
+</body>
+</html>
