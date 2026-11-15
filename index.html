@@ -458,6 +458,27 @@
       font-weight: bold;
       margin: 14px 0 0;
     }
+
+    /* Línea de estado de la copia a la hoja de Google. */
+    .estado-hoja {
+      margin: 10px 0 0;
+      font-size: 13px;
+      color: #70787f;
+      text-align: center;
+    }
+
+    /* Botón con aspecto de enlace, dentro de esa línea. */
+    .enlace {
+      background: none;
+      border: none;
+      padding: 0;
+      margin-left: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      color: #1a73e8;
+      text-decoration: underline;
+      cursor: pointer;
+    }
   </style>
 </head>
 
@@ -490,6 +511,11 @@
       <button class="vista" id="boton-resumen">Resumen</button>
     </div>
     </div>
+
+    <p class="estado-hoja">
+      <span id="texto-hoja">Copia a la hoja: sin configurar</span>
+      <button class="enlace" id="boton-hoja">Configurar</button>
+    </p>
 
     <p class="pista" id="pista">Toca una jornada para corregirla.</p>
     <p class="vacio" id="mensaje-vacio">Todavía no hay fichajes.</p>
@@ -1246,6 +1272,9 @@
 
       guardar();
       dibujar();
+
+      // La jornada ya está completa: buen momento para copiarla a la hoja.
+      copiarAHoja();
     }
 
     // 13. Qué pasa al pulsar "Deshacer":
@@ -1803,12 +1832,168 @@
       sugerirHora(campoSalida, campoEntrada, 15, 20);
     });
 
+    // 14b. COPIA A LA HOJA DE GOOGLE.
+    //      Los datos siguen viviendo en el cajón del navegador. Esto solo
+    //      manda una copia al buzón de Google, que la escribe en la hoja.
+
+    //      Tres cajones nuevos, al lado del de los fichajes.
+    const CAJON_DIRECCION = "direccion-hoja";
+    const CAJON_PENDIENTE = "copia-pendiente";
+    const CAJON_ULTIMA = "ultima-copia";
+
+    //      true mientras hay una copia en marcha, para no lanzar dos a la vez.
+    let copiaEnMarcha = false;
+
+    const textoHoja = document.getElementById("texto-hoja");
+    const botonHoja = document.getElementById("boton-hoja");
+
+    //      La dirección del buzón NO está en el código: se pega una vez en
+    //      cada teléfono y se queda en su cajón. Así no viaja a GitHub.
+    function direccionDeLaHoja() {
+      return localStorage.getItem(CAJON_DIRECCION);
+    }
+
+    //      Pinta la línea de estado. Como todo lo demás, es un reflejo:
+    //      mira los cajones y escribe lo que corresponde.
+    function pintarEstadoHoja() {
+      if (direccionDeLaHoja() === null) {
+        textoHoja.textContent = "Copia a la hoja: sin configurar";
+        botonHoja.textContent = "Configurar";
+        return;
+      }
+
+      botonHoja.textContent = "Copiar ahora";
+
+      if (copiaEnMarcha) {
+        textoHoja.textContent = "Copiando a la hoja…";
+        return;
+      }
+
+      if (localStorage.getItem(CAJON_PENDIENTE) !== null) {
+        textoHoja.textContent = "Copia pendiente";
+        return;
+      }
+
+      const ultima = localStorage.getItem(CAJON_ULTIMA);
+      if (ultima === null) {
+        textoHoja.textContent = "Hoja todavía sin copia";
+      } else {
+        textoHoja.textContent = "Hoja al día · " + horaCorta(Number(ultima));
+      }
+    }
+
+    //      "23:15" o "ayer 15:20".
+    function horaCorta(momento) {
+      const fecha = new Date(momento);
+      const hora = fecha.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+      if (fecha.toDateString() === new Date().toDateString()) {
+        return hora;
+      }
+      return fechaCorta(momento) + " " + hora;
+    }
+
+    //      Pide la dirección del buzón y la guarda en el cajón.
+    function configurarHoja() {
+      const actual = direccionDeLaHoja();
+      const respuesta = prompt(
+        "Pega la dirección del buzón de Google (termina en /exec). Déjalo vacío para dejar de copiar.",
+        actual === null ? "" : actual
+      );
+
+      if (respuesta === null) {
+        return;
+      }
+
+      const limpia = respuesta.trim();
+      if (limpia === "") {
+        localStorage.removeItem(CAJON_DIRECCION);
+        pintarEstadoHoja();
+        return;
+      }
+
+      localStorage.setItem(CAJON_DIRECCION, limpia);
+      pintarEstadoHoja();
+      copiarAHoja();
+    }
+
+    //      Convierte la tabla al formato que espera el buzón.
+    //      Las fechas viajan como texto normalizado (toISOString) para que
+    //      Google las entienda sin dudas.
+    function jornadasParaLaHoja() {
+      return fichajes.map(function (fila) {
+        return {
+          entrada: fila.entrada === null ? null : new Date(fila.entrada).toISOString(),
+          salida: fila.salida === null ? null : new Date(fila.salida).toISOString(),
+          minutos: minutosDe(fila),
+          tipo: tipoDe(fila),
+          corregido: fila.corregido === true
+        };
+      });
+    }
+
+    //      Envía TODA la tabla al buzón, que borra la pestaña y la reescribe.
+    //      Por eso una corrección o un borrado llegan sin esfuerzo.
+    function copiarAHoja() {
+      const direccion = direccionDeLaHoja();
+
+      if (direccion === null) {
+        configurarHoja();
+        return;
+      }
+
+      if (copiaEnMarcha) {
+        return;
+      }
+
+      copiaEnMarcha = true;
+      pintarEstadoHoja();
+
+      // fetch es la orden de "habla con ese servidor". El tipo de contenido
+      // es texto normal a propósito: así el navegador envía directamente,
+      // sin una pregunta previa que Apps Script no sabe contestar.
+      fetch(direccion, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ jornadas: jornadasParaLaHoja() })
+      })
+        .then(function (respuesta) {
+          if (!respuesta.ok) {
+            throw new Error("El buzón respondió " + respuesta.status);
+          }
+          return respuesta.json();
+        })
+        .then(function () {
+          // Salió bien: apuntamos la hora y borramos el aviso de pendiente.
+          localStorage.setItem(CAJON_ULTIMA, String(Date.now()));
+          localStorage.removeItem(CAJON_PENDIENTE);
+          copiaEnMarcha = false;
+          pintarEstadoHoja();
+        })
+        .catch(function (error) {
+          // Sin cobertura o buzón caído: lo dejamos pendiente y se
+          // reintenta al abrir la app. Fichar no se ve afectado.
+          console.log("Copia a la hoja fallida:", error);
+          localStorage.setItem(CAJON_PENDIENTE, "sí");
+          copiaEnMarcha = false;
+          pintarEstadoHoja();
+        });
+    }
+
+    botonHoja.addEventListener("click", copiarAHoja);
+
     // 15. Al abrir la página: recuperamos lo guardado, añadimos el historial
     //     de la hoja si todavía no está, y lo pintamos.
     cargar();
     cargarHistorial();
     dibujar();
     colocarBarraDeRegistro();
+    pintarEstadoHoja();
+
+    //     Si la última copia no pudo hacerse (sin cobertura), se reintenta
+    //     ahora, al abrir la app.
+    if (direccionDeLaHoja() !== null && localStorage.getItem(CAJON_PENDIENTE) !== null) {
+      copiarAHoja();
+    }
   </script>
 </body>
 </html>
