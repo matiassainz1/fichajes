@@ -364,7 +364,7 @@
       margin: 14px 0 6px;
     }
 
-    input {
+    input, textarea {
       width: 100%;
       box-sizing: border-box;
       padding: 12px;
@@ -372,6 +372,13 @@
       font-family: inherit;
       border: 1px solid #b6bdc6;
       border-radius: 10px;
+    }
+
+    /* El recuadro donde se pega la tabla al importar: letra más pequeña,
+       para que quepa más texto. */
+    textarea {
+      font-size: 14px;
+      margin-top: 12px;
     }
 
     .error {
@@ -419,6 +426,38 @@
       background: #b3261e;
       font-weight: bold;
     }
+
+    /* El título "Registro" y el botón "Importar tabla" comparten línea:
+       el título a la izquierda y el botón a la derecha. */
+    .titulo-registro {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0 4px;
+    }
+
+    .titulo-registro h2 {
+      margin: 0;
+    }
+
+    /* Botón "Importar tabla": justo encima de "Copiar tabla" y del mismo
+       tamaño. El ancho es un tercio de la fila, descontando los dos huecos
+       de 8 píxeles que hay entre los tres botones de abajo. */
+    .importar {
+      flex: none;
+      width: calc((100% - 16px) / 3);
+      padding: 12px 0;
+      font-size: 15px;
+      font-weight: normal;
+      color: #1c2733;
+      background: #dde1e6;
+    }
+
+    /* Mensaje con el resultado de la importación. */
+    .resultado {
+      font-weight: bold;
+      margin: 14px 0 0;
+    }
   </style>
 </head>
 
@@ -434,7 +473,10 @@
       </div>
     </div>
 
-    <h2>Registro</h2>
+    <div class="titulo-registro">
+      <h2>Registro</h2>
+      <button class="importar" id="boton-importar">Importar tabla</button>
+    </div>
     <div class="barra-registro" id="barra-registro">
     <div class="acciones-registro">
       <button class="deshacer" id="boton-deshacer" disabled>Deshacer</button>
@@ -527,6 +569,24 @@
     </div>
   </div>
 
+  <!-- Ventana para importar una tabla copiada con "Copiar tabla". Está oculta hasta que hace falta. -->
+  <div class="fondo" id="ventana-importar" hidden>
+    <div class="ventana">
+      <h2>Importar tabla</h2>
+
+      <p class="detalle" id="ayuda-importar">Pega aquí lo que has copiado con el botón «Copiar tabla». Las jornadas que ya estén en esta app no se repiten.</p>
+      <textarea id="campo-importar" rows="6" aria-label="Tabla copiada"></textarea>
+
+      <p class="error" id="error-importar" hidden></p>
+      <p class="resultado" id="resultado-importar" hidden></p>
+
+      <div class="acciones">
+        <button class="cancelar" id="boton-cerrar-importar">Cancelar</button>
+        <button class="guardar" id="boton-confirmar-importar">Importar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // COMPORTAMIENTO (JavaScript)
 
@@ -560,6 +620,14 @@
     const cuerpoResumen = document.getElementById("cuerpo-resumen");
     const grafico = document.getElementById("grafico");
     const detalleSemana = document.getElementById("detalle-semana");
+    const botonImportar = document.getElementById("boton-importar");
+    const ventanaImportar = document.getElementById("ventana-importar");
+    const ayudaImportar = document.getElementById("ayuda-importar");
+    const campoImportar = document.getElementById("campo-importar");
+    const errorImportar = document.getElementById("error-importar");
+    const resultadoImportar = document.getElementById("resultado-importar");
+    const botonCerrarImportar = document.getElementById("boton-cerrar-importar");
+    const botonConfirmarImportar = document.getElementById("boton-confirmar-importar");
 
     // 2. LOS DATOS. Esta lista es la "tabla" de la app: cada elemento es una
     //    fila con cuatro casillas:
@@ -1264,6 +1332,165 @@
       }
     }
 
+    // 13b-2. IMPORTAR UNA TABLA COPIADA.
+    //        Es el camino contrario al botón "Copiar tabla": recibe ese mismo
+    //        texto (pegado en un recuadro) y lo convierte otra vez en filas.
+    //        Sirve para pasar los fichajes de un aparato a otro, o de una
+    //        dirección web a otra.
+
+    //        Traduce un texto de la tabla ("28/10/26 08:04") al momento que
+    //        guarda la app. Admite el año con dos cifras o con cuatro. Si el
+    //        texto no tiene esa forma ("sin fichar", "pendiente"), devuelve null.
+    function momentoDeTextoDeTabla(texto) {
+      const trozos = texto.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2}),? +(\d{1,2}):(\d{2})/);
+      if (trozos === null) {
+        return null;
+      }
+      let ano = Number(trozos[3]);
+      if (ano < 100) {
+        ano = ano + 2000;
+      }
+      return new Date(ano, Number(trozos[2]) - 1, Number(trozos[1]),
+        Number(trozos[4]), Number(trozos[5])).getTime();
+    }
+
+    //        ¿Hay ya en la tabla esta misma jornada? Se reconoce por su entrada
+    //        o, si no tiene entrada, por su salida.
+    function yaExisteJornada(entrada, salida) {
+      for (const fila of fichajes) {
+        if (entrada !== null && fila.entrada === entrada) {
+          return true;
+        }
+        if (entrada === null && fila.entrada === null && fila.salida === salida) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    //        Abre la ventana de importar, vacía y lista para pegar.
+    function abrirImportar() {
+      campoImportar.value = "";
+      campoImportar.hidden = false;
+      ayudaImportar.hidden = false;
+      errorImportar.hidden = true;
+      resultadoImportar.hidden = true;
+      botonConfirmarImportar.hidden = false;
+      botonCerrarImportar.textContent = "Cancelar";
+      ventanaImportar.hidden = false;
+    }
+
+    function cerrarImportar() {
+      ventanaImportar.hidden = true;
+    }
+
+    //        Qué pasa al pulsar "Importar" en la ventana.
+    function importarTabla() {
+      errorImportar.hidden = true;
+
+      // Foto para poder deshacer la importación entera de una vez.
+      guardarFoto();
+
+      let importadas = 0;
+      let repetidas = 0;
+      let noEntendidas = 0;
+
+      // Una línea por jornada.
+      for (const linea of campoImportar.value.split("\n")) {
+        if (linea.trim() === "") {
+          continue;
+        }
+
+        // Las columnas van separadas por tabuladores (o por varios espacios,
+        // si al copiar y pegar se han perdido los tabuladores).
+        const casillas = linea.split(/\t| {2,}/);
+        const primera = casillas[0].trim();
+        let segunda = "";
+        if (casillas.length > 1) {
+          segunda = casillas[1].trim();
+        }
+        const ultima = casillas[casillas.length - 1].trim();
+
+        // La línea de títulos no es una jornada.
+        if (primera === "Entrada") {
+          continue;
+        }
+
+        const entrada = momentoDeTextoDeTabla(primera);
+        const salida = momentoDeTextoDeTabla(segunda);
+
+        // Se salta la línea si no tiene ni entrada ni salida, o si la salida
+        // no es posterior a la entrada.
+        if (entrada === null && salida === null) {
+          noEntendidas = noEntendidas + 1;
+          continue;
+        }
+        if (entrada !== null && salida !== null && salida <= entrada) {
+          noEntendidas = noEntendidas + 1;
+          continue;
+        }
+
+        if (yaExisteJornada(entrada, salida)) {
+          repetidas = repetidas + 1;
+          continue;
+        }
+
+        fichajes.push({
+          entrada: entrada,
+          salida: salida,
+          // "pendiente" es una entrada que todavía espera su salida.
+          abierta: entrada !== null && salida === null && segunda === "pendiente",
+          corregido: ultima === "Sí"
+        });
+        importadas = importadas + 1;
+      }
+
+      // Si no se ha añadido nada, la foto sobra: no hay nada que deshacer.
+      if (importadas === 0) {
+        historial.pop();
+
+        if (repetidas > 0) {
+          errorImportar.textContent = "No hay nada nuevo: esas jornadas ya estaban en esta app.";
+        } else {
+          errorImportar.textContent = "No he encontrado jornadas en ese texto. Cópialas con el botón «Copiar tabla» y pégalas aquí.";
+        }
+        errorImportar.hidden = false;
+        return;
+      }
+
+      ordenar();
+
+      // Solo puede haber una jornada esperando su salida: la más reciente.
+      let ultimaAbierta = null;
+      for (const fila of fichajes) {
+        if (fila.abierta) {
+          if (ultimaAbierta !== null) {
+            ultimaAbierta.abierta = false;
+          }
+          ultimaAbierta = fila;
+        }
+      }
+
+      guardar();
+      dibujar();
+
+      // La ventana se queda abierta para contar cómo ha ido.
+      let texto = "Jornadas importadas: " + importadas + ".";
+      if (repetidas > 0) {
+        texto = texto + " Ya estaban: " + repetidas + ".";
+      }
+      if (noEntendidas > 0) {
+        texto = texto + " Líneas que no se han entendido: " + noEntendidas + ".";
+      }
+      resultadoImportar.textContent = texto;
+      resultadoImportar.hidden = false;
+
+      campoImportar.hidden = true;
+      ayudaImportar.hidden = true;
+      botonConfirmarImportar.hidden = true;
+      botonCerrarImportar.textContent = "Cerrar";
+    }
+
     // 13c. RESUMEN.
     //      El resumen no se guarda: se calcula cada vez a partir de la tabla,
     //      igual que las tarjetas y la tabla. Son los mismos datos, agrupados.
@@ -1550,6 +1777,9 @@
     botonBorrar.addEventListener("click", borrarJornada);
     botonCopiar.addEventListener("click", copiarTabla);
     botonResumen.addEventListener("click", verResumen);
+    botonImportar.addEventListener("click", abrirImportar);
+    botonCerrarImportar.addEventListener("click", cerrarImportar);
+    botonConfirmarImportar.addEventListener("click", importarTabla);
 
     //     SEGUNDA BARRA FIJA. Mide la barra de fichar y le dice a la barra de
     //     registro que se pegue justo debajo. offsetHeight es la altura de un
